@@ -13,8 +13,8 @@ android {
         applicationId = "com.setubandhu.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 40
-        versionName = "1.15.17"
+        versionCode = 43
+        versionName = "1.15.20"
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")

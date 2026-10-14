@@ -578,6 +578,7 @@ fun SettingCard(item: SettingItem, accent: Color, isFav: Boolean, onToggleFav: (
     val haptic = LocalHapticFeedback.current
     var showHelp by remember { mutableStateOf(false) }
     var appDialog by remember { mutableStateOf<String?>(null) }
+    val pickAdhan: () -> Unit = if (item.action == ACTION_ADHAN) rememberAdhanPicker() else ({ })
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(targetValue = if (pressed) 0.88f else 1f, animationSpec = spring(dampingRatio = 0.4f), label = "press-scale")
@@ -595,7 +596,7 @@ fun SettingCard(item: SettingItem, accent: Color, isFav: Boolean, onToggleFav: (
                 indication = null,
                 onClick = {
                     if (item.helpText != null) showHelp = true
-                    else if (item.action == ACTION_ADHAN) { AdhanPlayer.toggle(context) }
+                    else if (item.action == ACTION_ADHAN) { if (AdhanPlayer.hasSource(context)) AdhanPlayer.toggle(context) else pickAdhan() }
                     else if (item.action != null && item.action.startsWith("app.")) appDialog = item.action
                     else if (item.action != null) openSetting(context, item.action)
                 },
@@ -948,7 +949,7 @@ fun computePrayerTimes(y: Int, m: Int, d: Int, lat: Double, lng: Double, tz: Dou
 private const val KEY_CITY = "city"
 
 fun loadCityIndex(context: Context): Int =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getInt(KEY_CITY, 0).coerceIn(0, saudiCities.size - 1)
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getInt(KEY_CITY, saudiCities.indexOfFirst { it.bn == "হাইল" }.coerceAtLeast(0)).coerceIn(0, saudiCities.size - 1)
 
 fun saveCityIndex(context: Context, index: Int) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putInt(KEY_CITY, index).apply()
@@ -969,7 +970,11 @@ fun setAlarmFor(context: Context, hours: Double, label: String) {
 }
 
 // ---------- আযান ----------
-// অডিও ফাইল: app/src/main/res/raw/adhan.mp3 (ছোট হাতের নাম)। ফাইল না থাকলে বার্তা দেখাবে।
+// অডিও: সাধারণ আযান = res/raw/adhan.* অথবা ফোন থেকে বেছে নেওয়া ফাইল।
+// ফজরের আযান = আলাদাভাবে বেছে নেওয়া ফাইল; না বাছলে সাধারণ আযানই বাজবে।
+private const val KEY_ADHAN_URI = "adhan_uri"
+private const val KEY_FAJR_URI = "adhan_fajr_uri"
+
 object AdhanPlayer {
     private var player: MediaPlayer? = null
 
@@ -981,19 +986,81 @@ object AdhanPlayer {
         player = null
     }
 
-    fun toggle(context: Context): Boolean {
+    fun stopPlaying() { stop() }
+
+    private fun rawId(context: Context): Int =
+        context.resources.getIdentifier("adhan", "raw", context.packageName)
+
+    private fun keyFor(fajr: Boolean): String = if (fajr) KEY_FAJR_URI else KEY_ADHAN_URI
+
+    private fun savedUri(context: Context, fajr: Boolean): Uri? {
+        val str = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(keyFor(fajr), "") ?: ""
+        return if (str.isBlank()) null else Uri.parse(str)
+    }
+
+    fun saveUri(context: Context, uri: Uri, fajr: Boolean = false) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(keyFor(fajr), uri.toString()).apply()
+    }
+
+    private fun clearUri(context: Context, fajr: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().remove(keyFor(fajr)).apply()
+    }
+
+    private fun fromUri(app: Context, uri: Uri): MediaPlayer? {
+        return try {
+            val m = MediaPlayer()
+            m.setDataSource(app, uri)
+            m.prepare()
+            m
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** আযান চালানোর মতো কোনো অডিও আছে কি না (ফজর চাইলে ফজরের ফাইল বা সাধারণ আযান) */
+    fun hasSource(context: Context, fajr: Boolean = false): Boolean =
+        (fajr && savedUri(context, true) != null) || rawId(context) != 0 || savedUri(context, false) != null
+
+    fun toggle(context: Context, fajr: Boolean = false): Boolean {
         if (isPlaying()) {
             stop()
             Toast.makeText(context, tr("আযান বন্ধ করা হয়েছে"), Toast.LENGTH_SHORT).show()
             return false
         }
         stop()
-        val resId = context.resources.getIdentifier("adhan", "raw", context.packageName)
-        if (resId == 0) {
-            Toast.makeText(context, tr("আযানের অডিও ফাইল (adhan.mp3) এখনো যোগ করা হয়নি"), Toast.LENGTH_LONG).show()
-            return false
+        val app = context.applicationContext
+        var mp: MediaPlayer? = null
+
+        if (fajr) {
+            val fajrUri = savedUri(context, true)
+            if (fajrUri != null) {
+                mp = fromUri(app, fajrUri)
+                if (mp == null) {
+                    clearUri(context, true)
+                    Toast.makeText(context, tr("ফজরের ফাইলটি পাওয়া যায়নি, সাধারণ আযান চলছে"), Toast.LENGTH_LONG).show()
+                }
+            }
         }
-        val mp = MediaPlayer.create(context.applicationContext, resId)
+
+        if (mp == null) {
+            val resId = rawId(context)
+            if (resId != 0) {
+                mp = MediaPlayer.create(app, resId)
+            } else {
+                val uri = savedUri(context, false)
+                if (uri == null) {
+                    Toast.makeText(context, tr("আযানের অডিও ফাইল বেছে নিন"), Toast.LENGTH_LONG).show()
+                    return false
+                }
+                mp = fromUri(app, uri)
+                if (mp == null) {
+                    clearUri(context, false)
+                    Toast.makeText(context, tr("ফাইলটি পাওয়া যায়নি, আবার বেছে নিন"), Toast.LENGTH_LONG).show()
+                    return false
+                }
+            }
+        }
+
         if (mp == null) {
             Toast.makeText(context, tr("আযান চালানো যায়নি"), Toast.LENGTH_SHORT).show()
             return false
@@ -1006,12 +1073,31 @@ object AdhanPlayer {
     }
 }
 
+/** ফোন থেকে আযানের অডিও বেছে নেওয়ার লঞ্চার। ফাইল বাছাই হলে সেটি মনে রাখে ও সাথে সাথে চালায়। */
+@Composable
+fun rememberAdhanPicker(fajr: Boolean = false, onResult: (Boolean) -> Unit = {}): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) { }
+            AdhanPlayer.saveUri(context, uri, fajr)
+            AdhanPlayer.stopPlaying()
+            onResult(AdhanPlayer.toggle(context, fajr))
+        }
+    }
+    return { launcher.launch(arrayOf("audio/*")) }
+}
+
 @Composable
 fun PrayerTimesDialog(accent: Color, onDismiss: () -> Unit) {
     val context = LocalContext.current
     var cityIndex by remember { mutableStateOf(loadCityIndex(context)) }
     var menuOpen by remember { mutableStateOf(false) }
     var playing by remember { mutableStateOf(AdhanPlayer.isPlaying()) }
+    val pickAdhan = rememberAdhanPicker(false) { started -> playing = started }
+    val pickFajr = rememberAdhanPicker(true) { started -> playing = started }
 
     val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Riyadh"))
     val city = saudiCities[cityIndex]
@@ -1057,11 +1143,20 @@ fun PrayerTimesDialog(accent: Color, onDismiss: () -> Unit) {
                     }
                 }
                 Button(
-                    onClick = { playing = AdhanPlayer.toggle(context) },
+                    onClick = { if (playing || AdhanPlayer.hasSource(context)) playing = AdhanPlayer.toggle(context) else pickAdhan() },
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(containerColor = accent),
                     modifier = Modifier.fillMaxWidth()
                 ) { ETxt(if (playing) tr("⏹ আযান বন্ধ করুন") else tr("🔊 আযান শুনুন"), color = Color.White, fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = { if (playing || AdhanPlayer.hasSource(context, true)) playing = AdhanPlayer.toggle(context, true) else pickFajr() },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth()
+                ) { ETxt(if (playing) tr("⏹ আযান বন্ধ করুন") else tr("🌅 ফজরের আযান শুনুন"), color = accent, fontWeight = FontWeight.Bold) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { pickAdhan() }) { Text(tr("🎵 আযানের ফাইল"), color = accent, fontSize = 12.sp) }
+                    TextButton(onClick = { pickFajr() }) { Text(tr("🎵 ফজরের ফাইল"), color = accent, fontSize = 12.sp) }
+                }
                 Text(
                     tr("⏰ চাপলে ফোনের অ্যালার্ম খুলবে। সময় হিসাব করে বের করা (উম্মুল কুরা পদ্ধতি), রমজানে এশা আরও ৩০ মিনিট পরে হয়। মসজিদের সময়ের সাথে মিলিয়ে নিন।"),
                     fontSize = 11.sp, color = Color(0xFF666666)
