@@ -1,0 +1,305 @@
+package com.setubandhu.app
+
+import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
+// অ্যাপের ভাষা: বাংলা (ডিফল্ট), ইংরেজি, আরবি।
+// বাংলা টেক্সটই "চাবি" হিসেবে ব্যবহার হয়; tr("বাংলা লেখা") ইংরেজি/আরবিতে অনুবাদ ফেরত দেয়।
+// অনুবাদ না থাকলে বাংলা লেখাই দেখাবে। নতুন লেখা যোগ করতে নিচের translations তালিকায় লাইন যোগ করুন।
+enum class AppLang(val code: String, val nativeName: String) {
+    BN("bn", "বাংলা"),
+    EN("en", "English"),
+    AR("ar", "العربية")
+}
+
+const val SHARED_PREFS = "setubandhu"
+private const val KEY_LANG = "lang"
+
+var appLang by mutableStateOf(AppLang.BN)
+
+fun loadLang(context: Context) {
+    val code = context.getSharedPreferences(SHARED_PREFS, Context.MODE_PRIVATE).getString(KEY_LANG, "bn")
+    appLang = AppLang.values().firstOrNull { it.code == code } ?: AppLang.BN
+}
+
+fun saveLang(context: Context, lang: AppLang) {
+    appLang = lang
+    context.getSharedPreferences(SHARED_PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LANG, lang.code).apply()
+}
+
+fun l3(bn: String, en: String, ar: String): String = when (appLang) {
+    AppLang.BN -> bn
+    AppLang.EN -> en
+    AppLang.AR -> ar
+}
+
+fun tr(bn: String): String {
+    if (appLang == AppLang.BN) return bn
+    val t = translations[bn] ?: return bn
+    return if (appLang == AppLang.EN) t.first else t.second
+}
+
+// "আর X ঘণ্টা Y মিনিট পর" ধরনের বাকি-সময়ের লেখা
+fun remainingText(totalMinutes: Int): String {
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
+    return when (appLang) {
+        AppLang.BN -> if (h > 0) "${bn(h)} ঘণ্টা ${bn(m)} মিনিট পর" else "${bn(m)} মিনিট পর"
+        AppLang.EN -> if (h > 0) "in $h h $m min" else "in $m min"
+        AppLang.AR -> if (h > 0) "بعد ${bn(h)} ساعة و${bn(m)} دقيقة" else "بعد ${bn(m)} دقيقة"
+    }
+}
+
+fun daysLeftText(days: Int, soon: Boolean): String = when (appLang) {
+    AppLang.BN -> "আর ${bn(days)} দিন" + (if (soon) ", শীঘ্রই নবায়ন করুন" else "")
+    AppLang.EN -> "$days days left" + (if (soon) ", renew soon" else "")
+    AppLang.AR -> "باقي ${bn(days)} يوم" + (if (soon) "، جدّد قريباً" else "")
+}
+
+private val translations: Map<String, Pair<String, String>> = mapOf(
+    "ছবি এডিট" to ("Photo Editor" to "تحرير الصور"),
+    "লাইভ লোকেশন" to ("Live Location" to "الموقع المباشر"),
+    "লোকেশন পাঠান" to ("Send Location" to "إرسال الموقع"),
+    "নামাজের সময়" to ("Prayer Times" to "مواقيت الصلاة"),
+    "আযান" to ("Adhan" to "الأذان"),
+    "রিমাইন্ডার" to ("Reminders" to "التذكيرات"),
+    "জরুরি নম্বর" to ("Emergency Numbers" to "أرقام الطوارئ"),
+    "মালিক" to ("Owner / Sponsor" to "الكفيل"),
+    "ওয়াইফাই" to ("Wi-Fi" to "واي فاي"),
+    "ব্লুটুথ" to ("Bluetooth" to "بلوتوث"),
+    "ফ্লাইট মোড" to ("Airplane Mode" to "وضع الطيران"),
+    "মোবাইল নেটওয়ার্ক" to ("Mobile Network" to "شبكة الجوال"),
+    "ভিপিএন" to ("VPN" to "في بي إن"),
+    "এপিএন" to ("APN" to "نقاط الوصول APN"),
+    "নেটওয়ার্ক অপারেটর" to ("Network Operator" to "مشغل الشبكة"),
+    "রোমিং" to ("Roaming" to "التجوال"),
+    "এনএফসি" to ("NFC" to "الاتصال قريب المدى NFC"),
+    "হটস্পট ও টিথারিং" to ("Hotspot & Tethering" to "نقطة الاتصال والربط"),
+    "সিম কার্ড" to ("SIM Card" to "شريحة SIM"),
+    "ডিসপ্লে" to ("Display" to "الشاشة"),
+    "সাউন্ড" to ("Sound" to "الصوت"),
+    "উজ্জ্বলতা" to ("Brightness" to "السطوع"),
+    "স্ক্রিন টাইমআউট" to ("Screen Timeout" to "مهلة الشاشة"),
+    "স্ক্রিন সেভার" to ("Screen Saver" to "شاشة التوقف"),
+    "ক্যাপশন" to ("Captions" to "الترجمة النصية"),
+    "হোম অ্যাপ" to ("Home App" to "تطبيق الشاشة الرئيسية"),
+    "ডিফল্ট অ্যাপস" to ("Default Apps" to "التطبيقات الافتراضية"),
+    "অ্যাপ ম্যানেজ" to ("Manage Apps" to "إدارة التطبيقات"),
+    "অ্যাপ পারমিশন" to ("App Permissions" to "أذونات التطبيقات"),
+    "স্টোরেজ" to ("Storage" to "التخزين"),
+    "ইউসেজ অ্যাক্সেস" to ("Usage Access" to "الوصول للاستخدام"),
+    "প্রিন্ট" to ("Print" to "الطباعة"),
+    "কীবোর্ড" to ("Keyboard" to "لوحة المفاتيح"),
+    "সাধারণ সেটিংস" to ("General Settings" to "الإعدادات العامة"),
+    "তারিখ ও সময়" to ("Date & Time" to "التاريخ والوقت"),
+    "ফোনের ভাষা" to ("Phone Language" to "لغة الهاتف"),
+    "অ্যালবাম" to ("Album" to "الألبوم"),
+    "সিঙ্ক" to ("Sync" to "المزامنة"),
+    "ডিভাইস তথ্য" to ("Device Info" to "معلومات الجهاز"),
+    "ডেভেলপার অপশন" to ("Developer Options" to "خيارات المطور"),
+    "সিস্টেম সেটিংস পরিবর্তন" to ("Modify System Settings" to "تعديل إعدادات النظام"),
+    "অ্যাকাউন্ট যোগ" to ("Add Account" to "إضافة حساب"),
+    "সিকিউরিটি" to ("Security" to "الأمان"),
+    "প্রাইভেসি" to ("Privacy" to "الخصوصية"),
+    "ফিঙ্গারপ্রিন্ট/স্ক্রিন লক" to ("Fingerprint / Screen Lock" to "البصمة / قفل الشاشة"),
+    "অ্যাক্সেসিবিলিটি" to ("Accessibility" to "إمكانية الوصول"),
+    "স্ক্রিন ওভারলে" to ("Screen Overlay" to "العرض فوق التطبيقات"),
+    "নোটিফিকেশন অ্যাক্সেস" to ("Notification Access" to "الوصول إلى الإشعارات"),
+    "নোটিফিকেশন" to ("Notifications" to "الإشعارات"),
+    "ডু নট ডিস্টার্ব" to ("Do Not Disturb" to "عدم الإزعاج"),
+    "ইমার্জেন্সি অ্যালার্ট" to ("Emergency Alerts" to "تنبيهات الطوارئ"),
+    "লোকেশন" to ("Location" to "الموقع"),
+    "ব্যাটারি সেভার" to ("Battery Saver" to "توفير البطارية"),
+    "ফ্যাক্টরি রিসেট" to ("Factory Reset" to "إعادة ضبط المصنع"),
+    "পাওয়ার অফ" to ("Power Off" to "إيقاف التشغيل"),
+    "রিস্টার্ট" to ("Restart" to "إعادة التشغيل"),
+    "স্ক্রিনশট" to ("Screenshot" to "لقطة الشاشة"),
+    "ইফতারের সময়সূচি" to ("Iftar Schedule" to "جدول الإفطار"),
+    "ক্যালেন্ডার" to ("Calendar" to "التقويم"),
+    "বয়স ক্যালকুলেটর" to ("Age Calculator" to "حاسبة العمر"),
+    "ভাষা সেটিংস" to ("Language Settings" to "إعدادات اللغة"),
+    "বিষয় অনুযায়ী উপদেশ" to ("Advice by Topic" to "نصائح حسب الموضوع"),
+    "যে বিষয়ে জানতে চান, সেই বাটনে চাপ দিন" to ("Tap a button for the topic you want" to "اضغط على الموضوع الذي تريده"),
+    "মালিকের সাথে আচরণ" to ("Behaviour with Your Employer" to "التعامل مع صاحب العمل"),
+    "গাড়ি চালানোর কানুন" to ("Rules of Driving" to "آداب وقواعد القيادة"),
+    "গাড়ির রক্ষণাবেক্ষণ" to ("Car Maintenance" to "صيانة السيارة"),
+    "মায়ের সাথে আচরণ" to ("Behaviour with Mother" to "التعامل مع الأم"),
+    "ছোট ভাইয়ের সাথে আচরণ" to ("Behaviour with Younger Brother" to "التعامل مع الأخ الأصغر"),
+    "বাবার সাথে আচরণ" to ("Behaviour with Father" to "التعامل مع الأب"),
+    "কেমন স্ত্রী হবে" to ("Choosing a Wife" to "كيف تختار الزوجة"),
+    "কেমন লোকের সাথে চলবে" to ("Whom to Keep Company With" to "مع من تصاحب"),
+    "কফিলের পরিবারের সাথে ব্যবহার" to ("Behaviour with Kafeel's Family" to "التعامل مع أسرة الكفيل"),
+    "ওয়াইফাই আইপি" to ("Wi-Fi IP" to "عنوان IP للواي فاي"),
+    "রিডিং মোড" to ("Reading Mode" to "وضع القراءة"),
+    "অ্যাপ তথ্য" to ("App Info" to "معلومات التطبيق"),
+    "অ্যাপ আনইনস্টল" to ("Uninstall App" to "إلغاء تثبيت التطبيق"),
+    "উপদেশ" to ("Advice" to "نصيحة"),
+    "বাবার উপদেশ" to ("Father's Advice" to "وصية الأب"),
+    "ড্রাইভার ও নামাজ" to ("Driver & Prayer" to "السائق والصلاة"),
+    "নেটওয়ার্ক ও সংযোগ" to ("Network & Connections" to "الشبكة والاتصال"),
+    "ডিসপ্লে ও সাউন্ড" to ("Display & Sound" to "الشاشة والصوت"),
+    "অ্যাপস ও স্টোরেজ" to ("Apps & Storage" to "التطبيقات والتخزين"),
+    "সিস্টেম ও সাধারণ" to ("System & General" to "النظام والعام"),
+    "সিকিউরিটি ও প্রাইভেসি" to ("Security & Privacy" to "الأمان والخصوصية"),
+    "নোটিফিকেশন ও অ্যালার্ট" to ("Notifications & Alerts" to "الإشعارات والتنبيهات"),
+    "পাওয়ার ও রিসেট" to ("Power & Reset" to "الطاقة وإعادة الضبط"),
+    "প্রিয় সেটিংস" to ("Favorite Settings" to "الإعدادات المفضلة"),
+    "নিরাপত্তার কারণে এই কাজটা কোনো সাধারণ অ্যাপ সরাসরি করতে পারে না। নিজে করতে হলে:\n\n১. Settings খুলুন\n২. System (বা General Management) এ যান\n৩. Reset options ট্যাপ করুন\n৪. Factory data reset বেছে নিন\n\n⚠️ এতে ফোনের সব ডেটা মুছে যাবে, তাই আগে ব্যাকআপ নিন।" to ("For security reasons, a normal app cannot do this directly. To do it yourself:\n\n1. Open Settings\n2. Go to System (or General Management)\n3. Tap Reset options\n4. Choose Factory data reset\n\n⚠️ This erases all data on the phone, so back up first." to "لأسباب أمنية لا يمكن لأي تطبيق عادي تنفيذ هذا مباشرة. لتنفيذه بنفسك:\n\n١. افتح الإعدادات (Settings)\n٢. انتقل إلى النظام (System) أو الإدارة العامة (General Management)\n٣. اضغط على خيارات إعادة الضبط (Reset options)\n٤. اختر إعادة ضبط بيانات المصنع (Factory data reset)\n\n⚠️ سيؤدي هذا إلى مسح جميع بيانات الهاتف، لذا خذ نسخة احتياطية أولاً."),
+    "ফোনের ডান পাশের Power বাটন ৩-৫ সেকেন্ড চেপে ধরুন। একটা মেনু আসবে, সেখানে \"Power off\" লেখায় ট্যাপ করুন।" to ("Press and hold the Power button on the right side of the phone for 3-5 seconds. A menu will appear; tap \"Power off\"." to "اضغط مطولاً على زر التشغيل (Power) في الجانب الأيمن من الهاتف لمدة ٣-٥ ثوانٍ. ستظهر قائمة، اضغط على \"Power off\"."),
+    "Power বাটন ৩-৫ সেকেন্ড চেপে ধরুন। মেনু থেকে \"Restart\" বা \"পুনরায় চালু করুন\" অপশনে ট্যাপ করুন।" to ("Press and hold the Power button for 3-5 seconds. From the menu, tap \"Restart\"." to "اضغط مطولاً على زر التشغيل (Power) لمدة ٣-٥ ثوانٍ. من القائمة اضغط على \"Restart\" أو \"إعادة التشغيل\"."),
+    "Power বাটন আর Volume Down (নিচের ভলিউম) বাটন একসাথে ২-৩ সেকেন্ড চেপে ধরুন। স্ক্রিনশট Gallery/Photos অ্যাপে সেভ হয়ে যাবে।" to ("Press and hold the Power button and the Volume Down button together for 2-3 seconds. The screenshot is saved in the Gallery/Photos app." to "اضغط مطولاً على زر التشغيل (Power) وزر خفض الصوت (Volume Down) معاً لمدة ٢-٣ ثوانٍ. ستُحفظ لقطة الشاشة في تطبيق المعرض/الصور."),
+    "এই সেটিং এই ফোনে পাওয়া যায়নি" to ("This setting is not available on this phone" to "هذا الإعداد غير متوفر على هذا الهاتف"),
+    "প্রিয় থেকে সরানো হয়েছে" to ("Removed from favorites" to "تمت الإزالة من المفضلة"),
+    "প্রিয়তে যোগ হয়েছে ⭐" to ("Added to favorites ⭐" to "تمت الإضافة إلى المفضلة ⭐"),
+    "সেতুবন্ধু" to ("Setubandhu" to "سيتوبندهو"),
+    "কোনো সেটিং পাওয়া যায়নি" to ("No settings found" to "لم يتم العثور على أي إعداد"),
+    "কোনো সেটিংয়ে চেপে ধরে রাখলে সেটা এখানে প্রিয় হিসেবে যোগ হবে ⭐" to ("Long-press any setting to add it here as a favorite ⭐" to "اضغط مطولاً على أي إعداد لإضافته هنا كمفضل ⭐"),
+    "সেটিং খুঁজুন (বাংলা বা English)" to ("Search settings (Bangla or English)" to "ابحث في الإعدادات (بالعربية أو الإنجليزية أو البنغالية)"),
+    "বাতিল" to ("Cancel" to "إلغاء"),
+    "← আগের" to ("← Previous" to "→ السابق"),
+    "পরের →" to ("Next →" to "التالي ←"),
+    "বুঝেছি" to ("Got it" to "فهمت"),
+    "বন্ধ করুন" to ("Close" to "إغلاق"),
+    "সেভ করে বন্ধ করুন" to ("Save & close" to "حفظ وإغلاق"),
+    "আমার বর্তমান লোকেশন" to ("My current location" to "موقعي الحالي"),
+    "শেয়ার করার অ্যাপ পাওয়া যায়নি" to ("No app found to share with" to "لم يتم العثور على تطبيق للمشاركة"),
+    "মেসেজ অ্যাপ পাওয়া যায়নি" to ("No messaging app found" to "لم يتم العثور على تطبيق رسائل"),
+    "লোকেশন খোঁজা হচ্ছে… (খোলা জায়গায় দ্রুত পাওয়া যায়)" to ("Finding location… (faster in open areas)" to "جارٍ تحديد الموقع… (أسرع في الأماكن المفتوحة)"),
+    "লোকেশন পাওয়া যায়নি। ফোনের লোকেশন (GPS) চালু আছে কিনা দেখুন।" to ("Location not found. Check that the phone's location (GPS) is turned on." to "تعذر تحديد الموقع. تأكد من تشغيل الموقع (GPS) في الهاتف."),
+    "পারমিশন না দিলে লোকেশন পাঠানো যাবে না।" to ("Location cannot be sent without permission." to "لا يمكن إرسال الموقع بدون الإذن."),
+    "📍  লোকেশন পাঠান" to ("📍  Send Location" to "📍  إرسال الموقع"),
+    "আপনার বর্তমান লোকেশনের গুগল ম্যাপ লিংক তৈরি হবে। পাঠানোর আগে আপনি নিজে দেখে নিশ্চিত করবেন।" to ("A Google Maps link of your current location will be created. You will review it yourself before sending." to "سيتم إنشاء رابط خرائط جوجل لموقعك الحالي. ستراجعه بنفسك قبل الإرسال."),
+    "যেকোনো অ্যাপে পাঠান" to ("Send via any app" to "إرسال عبر أي تطبيق"),
+    "প্রিয়জনের ফোন নম্বর" to ("Loved one's phone number" to "رقم هاتف شخص عزيز"),
+    "এই নম্বরে এসএমএস করুন" to ("Send SMS to this number" to "أرسل رسالة SMS إلى هذا الرقم"),
+    "রিয়াদ" to ("Riyadh" to "الرياض"),
+    "জেদ্দা" to ("Jeddah" to "جدة"),
+    "মক্কা" to ("Makkah" to "مكة المكرمة"),
+    "মদিনা" to ("Madinah" to "المدينة المنورة"),
+    "দাম্মাম" to ("Dammam" to "الدمام"),
+    "আল খোবার" to ("Al Khobar" to "الخبر"),
+    "তায়েফ" to ("Taif" to "الطائف"),
+    "তাবুক" to ("Tabuk" to "تبوك"),
+    "বুরাইদা" to ("Buraidah" to "بريدة"),
+    "আবহা" to ("Abha" to "أبها"),
+    "হাইল" to ("Hail" to "حائل"),
+    "জাজান" to ("Jazan" to "جازان"),
+    "ইয়ানবু" to ("Yanbu" to "ينبع"),
+    "জুবাইল" to ("Jubail" to "الجبيل"),
+    "নাজরান" to ("Najran" to "نجران"),
+    "হফুফ (আল আহসা)" to ("Hofuf (Al-Ahsa)" to "الهفوف (الأحساء)"),
+    "অ্যালার্ম অ্যাপ পাওয়া যায়নি" to ("No alarm app found" to "لم يتم العثور على تطبيق منبه"),
+    "আযান বন্ধ করা হয়েছে" to ("Adhan stopped" to "تم إيقاف الأذان"),
+    "আযানের অডিও ফাইল (adhan.mp3) এখনো যোগ করা হয়নি" to ("The adhan audio file (adhan.mp3) has not been added yet" to "لم تتم إضافة ملف صوت الأذان (adhan.mp3) بعد"),
+    "আযান চালানো যায়নি" to ("Could not play the adhan" to "تعذر تشغيل الأذان"),
+    "আযান চলছে 🔊" to ("Adhan is playing 🔊" to "الأذان قيد التشغيل 🔊"),
+    "ফজর" to ("Fajr" to "الفجر"),
+    "সূর্যোদয়" to ("Sunrise" to "الشروق"),
+    "যোহর" to ("Dhuhr" to "الظهر"),
+    "আসর" to ("Asr" to "العصر"),
+    "মাগরিব" to ("Maghrib" to "المغرب"),
+    "এশা" to ("Isha" to "العشاء"),
+    "🕌  নামাজের সময়" to ("🕌  Prayer Times" to "🕌  مواقيت الصلاة"),
+    "পরের নামাজ" to ("Next prayer" to "الصلاة القادمة"),
+    "বাংলাদেশে" to ("In Bangladesh" to "في بنغلاديش"),
+    "নামাজ" to ("Prayer" to "صلاة"),
+    "⏹ আযান বন্ধ করুন" to ("⏹ Stop adhan" to "⏹ إيقاف الأذان"),
+    "🔊 আযান শুনুন" to ("🔊 Listen to adhan" to "🔊 استمع إلى الأذان"),
+    "⏰ চাপলে ফোনের অ্যালার্ম খুলবে। সময় হিসাব করে বের করা (উম্মুল কুরা পদ্ধতি), রমজানে এশা আরও ৩০ মিনিট পরে হয়। মসজিদের সময়ের সাথে মিলিয়ে নিন।" to ("⏰ Tapping opens the phone's alarm. Times are calculated (Umm al-Qura method); in Ramadan Isha is 30 minutes later. Please check against your mosque's timings." to "⏰ عند الضغط يفتح منبه الهاتف. الأوقات محسوبة (طريقة أم القرى)، وفي رمضان يكون العشاء بعد ٣٠ دقيقة إضافية. يرجى مطابقتها مع توقيت المسجد."),
+    "ইকামা" to ("Iqama" to "الإقامة"),
+    "ড্রাইভিং লাইসেন্স" to ("Driving License" to "رخصة القيادة"),
+    "গাড়ির ইসতিমারা" to ("Vehicle Istimara" to "استمارة المركبة"),
+    "গাড়ির ইনসুরেন্স" to ("Vehicle Insurance" to "تأمين المركبة"),
+    "ফাহাস (গাড়ি পরীক্ষা)" to ("Fahas (Vehicle Inspection)" to "الفحص الدوري (فحص المركبة)"),
+    "অন্যান্য" to ("Other" to "أخرى"),
+    "ক্যালেন্ডার অ্যাপ পাওয়া যায়নি" to ("No calendar app found" to "لم يتم العثور على تطبيق تقويم"),
+    "⏰  রিমাইন্ডার" to ("⏰  Reminders" to "⏰  التذكيرات"),
+    "কাগজের মেয়াদ শেষ হওয়ার তারিখ বসান। কত দিন বাকি তা এখানে দেখা যাবে।" to ("Enter the expiry date of the document. The days remaining will be shown here." to "أدخل تاريخ انتهاء الوثيقة. ستظهر هنا الأيام المتبقية."),
+    "📅 মেয়াদের তারিখ বেছে নিন" to ("📅 Choose expiry date" to "📅 اختر تاريخ الانتهاء"),
+    "এখনো কিছু যোগ করা হয়নি।" to ("Nothing has been added yet." to "لم تتم إضافة أي شيء بعد."),
+    "মেয়াদ শেষ হয়ে গেছে ⚠️" to ("Expired ⚠️" to "انتهت الصلاحية ⚠️"),
+    "📅 চাপলে মেয়াদের ৩০ দিন আগের জন্য ক্যালেন্ডারে রিমাইন্ডার তৈরি হবে।" to ("📅 Tapping creates a calendar reminder for 30 days before expiry." to "📅 عند الضغط يتم إنشاء تذكير في التقويم قبل ٣٠ يوماً من الانتهاء."),
+    "পুলিশ" to ("Police" to "الشرطة"),
+    "অ্যাম্বুলেন্স (রেড ক্রিসেন্ট)" to ("Ambulance (Red Crescent)" to "الإسعاف (الهلال الأحمر)"),
+    "ফায়ার সার্ভিস (সিভিল ডিফেন্স)" to ("Fire Service (Civil Defense)" to "الإطفاء (الدفاع المدني)"),
+    "ট্রাফিক পুলিশ" to ("Traffic Police" to "شرطة المرور"),
+    "ফোন অ্যাপ পাওয়া যায়নি" to ("No phone app found" to "لم يتم العثور على تطبيق هاتف"),
+    "নাম নেই" to ("No name" to "بدون اسم"),
+    "নম্বর পাওয়া যায়নি" to ("Number not found" to "لم يتم العثور على الرقم"),
+    "🚨  জরুরি নম্বর" to ("🚨  Emergency Numbers" to "🚨  أرقام الطوارئ"),
+    "📞 কল" to ("📞 Call" to "📞 اتصال"),
+    "আপন লোকজন (কাছের মানুষ)" to ("My people (close contacts)" to "أقاربي (المقربون)"),
+    "এখনো কারো নম্বর যোগ করা হয়নি।" to ("No numbers have been added yet." to "لم تتم إضافة أي رقم بعد."),
+    "কন্টাক্ট অ্যাপ পাওয়া যায়নি" to ("No contacts app found" to "لم يتم العثور على تطبيق جهات اتصال"),
+    "📇 ফোনবুক থেকে বেছে নিন" to ("📇 Choose from phonebook" to "📇 اختر من دفتر الهاتف"),
+    "নাম (যেমন: বাড়ি, আব্বা, বন্ধু)" to ("Name (e.g. Home, Father, Friend)" to "الاسم (مثل: المنزل، أبي، صديق)"),
+    "ফোন নম্বর (দেশের নম্বরে +৮৮০ সহ)" to ("Phone number (home-country numbers with +880)" to "رقم الهاتف (أرقام بلدك مع +880)"),
+    "➕ নম্বর যোগ করুন" to ("➕ Add number" to "➕ إضافة رقم"),
+    "📞 কল চাপলে ফোনের ডায়ালারে নম্বর বসে যাবে, আপনি নিজে কল চাপবেন।" to ("📞 Tapping Call puts the number in the phone dialer; you press call yourself." to "📞 عند الضغط على اتصال يوضع الرقم في تطبيق الاتصال، وتضغط أنت على زر الاتصال بنفسك."),
+    "👔  মালিক" to ("👔  Owner / Sponsor" to "👔  الكفيل"),
+    "মালিকের নাম" to ("Owner's name" to "اسم الكفيل"),
+    "মালিকের ফোন নম্বর" to ("Owner's phone number" to "رقم هاتف الكفيل"),
+    "নম্বর একবার সেভ করলে পরের বার সরাসরি কল বা মেসেজ করা যাবে। কল বাটন চাপলে ডায়ালারে নম্বর বসবে, আপনি নিজে কল চাপবেন।" to ("Once saved, you can call or message directly next time. The call button puts the number in the dialer; you press call yourself." to "بعد حفظ الرقم يمكنك الاتصال أو المراسلة مباشرة في المرة القادمة. زر الاتصال يضع الرقم في تطبيق الاتصال وتضغط أنت على الاتصال بنفسك."),
+    "হোয়াটসঅ্যাপের জন্য দেশের কোডসহ নম্বর দিন (যেমন +৮৮০…)" to ("For WhatsApp, enter the number with the country code (e.g. +880…)" to "للواتساب أدخل الرقم مع رمز الدولة (مثل +880…)"),
+    "হোয়াটসঅ্যাপ ইনস্টল করা নেই" to ("WhatsApp is not installed" to "واتساب غير مثبت"),
+    "💬 হোয়াটসঅ্যাপ" to ("💬 WhatsApp" to "💬 واتساب"),
+    "🟦 ইমো" to ("🟦 imo" to "🟦 إيمو"),
+    "ইমো" to ("imo" to "إيمو"),
+    "🔵 মেসেঞ্জার" to ("🔵 Messenger" to "🔵 ماسنجر"),
+    "মেসেঞ্জার" to ("Messenger" to "ماسنجر"),
+    "পারমিশন না দিলে লাইভ লোকেশন দেখানো যাবে না।" to ("Live location cannot be shown without permission." to "لا يمكن عرض الموقع المباشر بدون الإذن."),
+    "ফোনের লোকেশন (GPS) চালু করুন।" to ("Turn on the phone's location (GPS)." to "قم بتشغيل الموقع (GPS) في الهاتف."),
+    "🚗  লাইভ লোকেশন" to ("🚗  Live Location" to "🚗  الموقع المباشر"),
+    "লোকেশন খোঁজা হচ্ছে…" to ("Finding location…" to "جارٍ تحديد الموقع…"),
+    "📍 অক্ষাংশ: " to ("📍 Latitude: " to "📍 خط العرض: "),
+    "📍 দ্রাঘিমাংশ: " to ("📍 Longitude: " to "📍 خط الطول: "),
+    "🕒 শেষ আপডেট: " to ("🕒 Last update: " to "🕒 آخر تحديث: "),
+    "🎯 সঠিকতা" to ("🎯 Accuracy" to "🎯 الدقة"),
+    "🚗 গতি" to ("🚗 Speed" to "🚗 السرعة"),
+    "মিটার" to ("m" to "متر"),
+    "কিমি/ঘণ্টা" to ("km/h" to "كم/س"),
+    "আমার গাড়ি" to ("My car" to "سيارتي"),
+    "ম্যাপ অ্যাপ পাওয়া যায়নি" to ("No map app found" to "لم يتم العثور على تطبيق خرائط"),
+    "🗺️ গুগল ম্যাপে দেখুন" to ("🗺️ View on Google Maps" to "🗺️ عرض في خرائط جوجل"),
+    "📤 এই লোকেশন পাঠান" to ("📤 Send this location" to "📤 إرسال هذا الموقع"),
+    "এই পাতা খোলা থাকলে প্রতি কয়েক সেকেন্ডে লোকেশন নিজে আপডেট হয়। পাতা বন্ধ করলে আপডেট বন্ধ হয়ে যায়।" to ("While this page is open, the location updates automatically every few seconds. Updates stop when you close it." to "عندما تكون هذه الصفحة مفتوحة يتحدث الموقع تلقائياً كل بضع ثوانٍ. يتوقف التحديث عند إغلاقها."),
+    "ছবি যোগ করা যায়নি" to ("Could not add the photo" to "تعذرت إضافة الصورة"),
+    "← ফিরে যান" to ("← Back" to "→ رجوع"),
+    "🖼️ অ্যালবাম" to ("🖼️ Album" to "🖼️ الألبوم"),
+    "➕ ছবি" to ("➕ Photo" to "➕ صورة"),
+    "এখনো কোনো ছবি নেই। ➕ ছবি চেপে যোগ করুন।" to ("No photos yet. Tap ➕ Photo to add one." to "لا توجد صور بعد. اضغط ➕ صورة للإضافة."),
+    "✕ বন্ধ করুন" to ("✕ Close" to "✕ إغلاق"),
+    "🗑 মুছুন" to ("🗑 Delete" to "🗑 حذف"),
+    "আজ" to ("Today" to "اليوم"),
+    "বছর" to ("Years" to "سنوات"),
+    "মাস" to ("Months" to "أشهر"),
+    "দিন" to ("Days" to "أيام"),
+    "🌙  ইফতারের সময়সূচি" to ("🌙  Iftar Schedule" to "🌙  جدول الإفطار"),
+    "রমজান" to ("Ramadan" to "رمضان"),
+    "সেহরি শেষ" to ("Sehri ends" to "نهاية السحور"),
+    "ইফতার" to ("Iftar" to "الإفطار"),
+    "রোজা" to ("Fast" to "الصيام"),
+    "তারিখ" to ("Date" to "التاريخ"),
+    "সৌদির সময়" to ("Saudi time" to "توقيت السعودية"),
+    "বাংলাদেশের সময়" to ("Bangladesh time" to "توقيت بنغلاديش"),
+    "এখন দেখাচ্ছে" to ("Showing now" to "المعروض الآن"),
+    "⏰ ইফতার অ্যালার্ম" to ("⏰ Iftar alarm" to "⏰ منبه الإفطار"),
+    "⏰ সেহরি অ্যালার্ম" to ("⏰ Sehri alarm" to "⏰ منبه السحور"),
+    "সেহরির শেষ সময় ফজরের শুরুর সাথে মিলিয়ে ধরা হয়েছে। সময়গুলো হিসাব করে বের করা (উম্মুল কুরা পদ্ধতি) এবং রমজানের শুরু চাঁদ দেখার ওপর একদিন আগে-পরে হতে পারে। মসজিদের সময়ের সাথে মিলিয়ে নিন।" to ("Sehri end time is taken as the start of Fajr. Times are calculated (Umm al-Qura method), and the start of Ramadan may shift by a day depending on moon sighting. Please check against your mosque's timings." to "يُحتسب وقت نهاية السحور عند بداية الفجر. الأوقات محسوبة (طريقة أم القرى)، وقد يتغير بدء رمضان بيوم حسب رؤية الهلال. يرجى مطابقتها مع توقيت المسجد."),
+    "📅  ক্যালেন্ডার" to ("📅  Calendar" to "📅  التقويم"),
+    "📲 ফোনের ক্যালেন্ডার খুলুন" to ("📲 Open phone calendar" to "📲 افتح تقويم الهاتف"),
+    "ইংরেজি তারিখের নিচে ছোট সংখ্যাটি হিজরি তারিখ (উম্মুল কুরা)। চাঁদ দেখার ওপর হিজরি তারিখ একদিন আগে-পরে হতে পারে।" to ("The small number under each date is the Hijri date (Umm al-Qura). The Hijri date may differ by a day depending on moon sighting." to "الرقم الصغير تحت كل تاريخ هو التاريخ الهجري (أم القرى). قد يختلف التاريخ الهجري بيوم حسب رؤية الهلال."),
+    "🎂  বয়স ক্যালকুলেটর" to ("🎂  Age Calculator" to "🎂  حاسبة العمر"),
+    "আপনার জন্মতারিখ বেছে নিন, আজকের হিসাবে বয়স দেখাবে।" to ("Choose your date of birth to see your age as of today." to "اختر تاريخ ميلادك لعرض عمرك حتى اليوم."),
+    "📅 জন্মতারিখ বেছে নিন" to ("📅 Choose date of birth" to "📅 اختر تاريخ الميلاد"),
+    "জন্মতারিখ" to ("Date of birth" to "تاريخ الميلاد"),
+    "জন্মবার" to ("Day of birth" to "يوم الميلاد"),
+    "আজ পর্যন্ত মোট দিন" to ("Total days so far" to "إجمالي الأيام حتى اليوم"),
+    "পরের জন্মদিন" to ("Next birthday" to "عيد الميلاد القادم"),
+    "🎉 আজ আপনার জন্মদিন! শুভ জন্মদিন!" to ("🎉 Today is your birthday! Happy birthday!" to "🎉 اليوم عيد ميلادك! كل عام وأنت بخير!"),
+    "🌐  ভাষা সেটিংস" to ("🌐  Language Settings" to "🌐  إعدادات اللغة"),
+    "অ্যাপের ভাষা বেছে নিন। বেছে নেওয়া ভাষা মনে থাকবে।" to ("Choose the app language. Your choice will be remembered." to "اختر لغة التطبيق. سيتم تذكر اختيارك."),
+    "আরবি বেছে নিলে পুরো অ্যাপ ডান থেকে বামে চলবে।" to ("When Arabic is selected the whole app runs right-to-left." to "عند اختيار العربية يعمل التطبيق بالكامل من اليمين إلى اليسار.")
+)
